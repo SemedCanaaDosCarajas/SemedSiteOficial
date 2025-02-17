@@ -5040,14 +5040,16 @@ def educacao_infantil(request):
 from django.shortcuts import render
 from django.core.paginator import Paginator
 from .models import CadastroEI
+from django.contrib.auth.decorators import login_required
 
+@login_required
 def cadastro_escola(request):
     nome_escola = request.GET.get('nome_escola', '')
     ano = request.GET.get('ano', '')
     modalidade = request.GET.get('modalidade', '')
     turma = request.GET.get('turma', '')
 
-    # Verificação se o usuário é superuser
+    # Se for superuser, vê todos os registros; senão, vê apenas suas próprias turmas
     if request.user.is_superuser:
         escolas = CadastroEI.objects.all()
     else:
@@ -5061,24 +5063,25 @@ def cadastro_escola(request):
     if modalidade:
         escolas = escolas.filter(modalidade__icontains=modalidade)
     if turma:
-        escolas = escolas.filter(turma__nome__icontains=turma)  # Corrigido para buscar pelo nome da turma
+        escolas = escolas.filter(turma__icontains=turma)
 
-    # Contagem de registros
-    escolas_avaliadas = escolas.filter(avaliado="SIM")
-    escolas_nao_avaliadas = escolas.exclude(avaliado="SIM")
+    # 🔹 **Contagem correta das turmas sem contar alunos**
+    total_turmas = escolas.values("unidade_ensino", "turma").distinct().count()
+
+    # Contagem de alunos e escolas
     total_alunos = escolas.count()
-    total_turmas = escolas.values("turma__nome").distinct().count()  # Contar turmas distintas pelo nome
     total_escolas = escolas.values("unidade_ensino").distinct().count()
-    total_avaliados = escolas_avaliadas.count()
+    total_avaliados = escolas.filter(avaliado="SIM").count()
 
-    # Paginação
+    # Paginação para alunos não avaliados
+    escolas_nao_avaliadas = escolas.exclude(avaliado="SIM")
     paginator = Paginator(escolas_nao_avaliadas, 50)
     page_number = request.GET.get('page')
     escolas_paginadas = paginator.get_page(page_number)
 
-    # Listar nomes de escolas e turmas únicas
+    # Listar nomes de escolas e turmas
     escolas_nomes = escolas.order_by("unidade_ensino").values_list("unidade_ensino", flat=True).distinct()
-    turmas = escolas.order_by("turma__nome").values_list("turma__nome", flat=True).distinct()  # Buscar pelo nome da turma
+    turmas = escolas.values_list("turma", flat=True).distinct()
 
     # Criar query string para manter filtros na paginação
     query_params = request.GET.copy()
@@ -5088,7 +5091,7 @@ def cadastro_escola(request):
 
     context = {
         'escolas': escolas_paginadas,
-        'escolas_avaliadas': escolas_avaliadas,
+        'escolas_avaliadas': escolas.filter(avaliado="SIM"),
         'escolas_nomes': escolas_nomes,
         'turmas': turmas,
         'filtros': {
@@ -5098,7 +5101,7 @@ def cadastro_escola(request):
             'turma': turma,
         },
         'total_alunos': total_alunos,
-        'total_turmas': total_turmas,
+        'total_turmas': total_turmas,  # ✅ Agora está correto
         'total_escolas': total_escolas,
         'total_avaliados': total_avaliados,
         'query_string': query_string,
@@ -5107,9 +5110,6 @@ def cadastro_escola(request):
     }
 
     return render(request, 'webapp/cadastro_escola.html', context)
-
-
-
 
 ###***********************************************************************************************************************
 
@@ -5607,7 +5607,7 @@ def gestao_alunos(request):
     turmas = registros.order_by("turma__nome").values_list("turma__nome", flat=True).distinct()  # Retornar o nome das turmas
 
     total_alunos = registros.count()
-    total_turmas = registros.values("turma__nome").distinct().count()
+    total_turmas = registros.values("unidade_ensino", "turma").distinct().count()
     total_escolas = registros.values("unidade_ensino").distinct().count()
 
     registros_com_questoes = []
@@ -6575,30 +6575,59 @@ def login_prof(request):
 
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from .models import CadastroEI
+from .models import CadastroEI  # Certifique-se de importar os modelos corretos
 
 @login_required
 def modulo_pedagogico(request):
     usuario_logado = request.user
-    turma_nome = request.GET.get('turma', '')  # Captura o nome da turma, se estiver nos parâmetros da URL
+    nome_escola = request.GET.get('nome_escola', '')
+    ano = request.GET.get('ano', '')
+    modalidade = request.GET.get('modalidade', '')
+    turma_nome = request.GET.get('turma', '')
 
-    # Se for superuser, mostrar todos os alunos
+    # Verificação de superuser para acesso a todos os registros
     if usuario_logado.is_superuser:
         alunos = CadastroEI.objects.all()
     else:
-        professor_id = usuario_logado.id  # Ajuste conforme o campo que identifica o professor no usuário
-        alunos = CadastroEI.objects.filter(professor_id=professor_id)
+        alunos = CadastroEI.objects.filter(professor=usuario_logado)
 
-    # Aplicar filtro de turma, se especificado
+    # Aplicação dos filtros
+    if nome_escola:
+        alunos = alunos.filter(unidade_ensino__icontains=nome_escola)
+    if ano:
+        alunos = alunos.filter(ano=ano)
+    if modalidade:
+        alunos = alunos.filter(modalidade__icontains=modalidade)
     if turma_nome:
-        alunos = alunos.filter(turma__icontains=turma_nome)
+        alunos = alunos.filter(turma__nome__icontains=turma_nome)  # Alterado para trazer o nome da turma
+
+    # Contagem correta de turmas e escolas
+    total_alunos = alunos.count()
+    total_turmas = alunos.values("unidade_ensino", "turma__nome").distinct().count()
+    total_escolas = alunos.values("unidade_ensino").distinct().count()
+
+    # Opções para os filtros
+    escolas_nomes = alunos.order_by("unidade_ensino").values_list("unidade_ensino", flat=True).distinct()
+    turmas = alunos.order_by("turma__nome").values_list("turma__nome", flat=True).distinct()  # Alterado para pegar o nome
 
     context = {
         'alunos': alunos,
-        'turma_nome': turma_nome,  # Para mostrar o filtro aplicado
+        'escolas_nomes': escolas_nomes,
+        'turmas': turmas,
+        'total_alunos': total_alunos,
+        'total_turmas': total_turmas,
+        'total_escolas': total_escolas,
+        'filtros': {
+            'nome_escola': nome_escola,
+            'ano': ano,
+            'modalidade': modalidade,
+            'turma': turma_nome,
+        }
     }
 
     return render(request, 'webapp/modulo_pedagogico.html', context)
+
+
 
 
 
