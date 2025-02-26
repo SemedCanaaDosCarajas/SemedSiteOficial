@@ -3631,18 +3631,15 @@ def is_demanda_user(user):
     return user.groups.filter(name="Cadastro de Demandas").exists()
 
 
-@login_required
-@user_passes_test(is_demanda_user)
+
 def tipo_demandas(request):
     return render(request, 'demandas/tipo_demandas.html')
 
-@login_required
-@user_passes_test(is_demanda_user)
+
 def cadastro_demandas(request):
     return render(request, 'demandas/cadastro_demandas.html')
 
-@login_required
-@user_passes_test(is_demanda_user)
+
 def criar_demanda(request):
     if request.method == 'POST':
         form = TipoDemandaForm(request.POST)
@@ -3661,8 +3658,7 @@ def criar_demanda(request):
 
 
 
-@login_required
-@user_passes_test(lambda u: u.is_superuser)
+
 def gestao_demandas(request):
     demandas = TipoDemanda.objects.all()
     total_demandas = demandas.count()
@@ -3686,7 +3682,7 @@ from django.contrib.auth.decorators import user_passes_test
 def is_acesso_total_demandas(user):
     return user.groups.filter(name="Acesso Total Demandas").exists() or user.is_superuser
 
-@user_passes_test(is_acesso_total_demandas)
+
 def tipo_demandas(request):
     return render(request, 'demandas/tipo_demandas.html')
 
@@ -5039,7 +5035,11 @@ def educacao_infantil(request):
 
 from django.shortcuts import render
 from django.core.paginator import Paginator
+<<<<<<< HEAD
 from .models import CadastroEI
+=======
+from .models import CadastroEI, Escolas
+>>>>>>> 3a8008a (Modelo Professores SAMACC EDUCAÇÃO INFANTIL 2025 concluído)
 from django.contrib.auth.decorators import login_required
 
 @login_required
@@ -5049,11 +5049,23 @@ def cadastro_escola(request):
     modalidade = request.GET.get('modalidade', '')
     turma = request.GET.get('turma', '')
 
+<<<<<<< HEAD
     # Se for superuser, vê todos os registros; senão, vê apenas suas próprias turmas
+=======
+    # Se for superuser, vê todas as escolas e registros
+>>>>>>> 3a8008a (Modelo Professores SAMACC EDUCAÇÃO INFANTIL 2025 concluído)
     if request.user.is_superuser:
         escolas = CadastroEI.objects.all()
     else:
-        escolas = CadastroEI.objects.filter(professor=request.user)
+        # Verificar se o usuário é coordenador (está vinculado a uma escola)
+        escolas_vinculadas = Escolas.objects.filter(coordenador=request.user)
+        
+        # Se for coordenador, trazer todas as turmas da escola que ele coordena
+        if escolas_vinculadas.exists():
+            escolas = CadastroEI.objects.filter(unidade_ensino__in=escolas_vinculadas.values_list('nome', flat=True))
+        else:
+            # Caso contrário, traz apenas as turmas do professor logado
+            escolas = CadastroEI.objects.filter(professor=request.user)
 
     # Aplicar os filtros
     if nome_escola:
@@ -5063,10 +5075,20 @@ def cadastro_escola(request):
     if modalidade:
         escolas = escolas.filter(modalidade__icontains=modalidade)
     if turma:
+<<<<<<< HEAD
         escolas = escolas.filter(turma__icontains=turma)
 
     # 🔹 **Contagem correta das turmas sem contar alunos**
     total_turmas = escolas.values("unidade_ensino", "turma").distinct().count()
+=======
+        escolas = escolas.filter(turma__nome__icontains=turma)
+
+    # 🔹 **Trazer o nome da turma e não o ID**
+    escolas = escolas.select_related("turma")  # Se `turma` for um relacionamento ForeignKey, use select_related
+
+    # 🔹 **Contagem correta das turmas**
+    total_turmas = escolas.values("unidade_ensino", "turma__nome").distinct().count()
+>>>>>>> 3a8008a (Modelo Professores SAMACC EDUCAÇÃO INFANTIL 2025 concluído)
 
     # Contagem de alunos e escolas
     total_alunos = escolas.count()
@@ -5081,13 +5103,20 @@ def cadastro_escola(request):
 
     # Listar nomes de escolas e turmas
     escolas_nomes = escolas.order_by("unidade_ensino").values_list("unidade_ensino", flat=True).distinct()
+<<<<<<< HEAD
     turmas = escolas.values_list("turma", flat=True).distinct()
+=======
+    turmas = escolas.values_list("turma__nome", flat=True).distinct()  # Pegando o nome da turma em vez do ID
+>>>>>>> 3a8008a (Modelo Professores SAMACC EDUCAÇÃO INFANTIL 2025 concluído)
 
     # Criar query string para manter filtros na paginação
     query_params = request.GET.copy()
     if 'page' in query_params:
         del query_params['page']
     query_string = query_params.urlencode()
+
+    # Adicionar a verificação do coordenador no contexto
+    is_coordenador = Escolas.objects.filter(coordenador=request.user).exists()
 
     context = {
         'escolas': escolas_paginadas,
@@ -5107,10 +5136,21 @@ def cadastro_escola(request):
         'query_string': query_string,
         'range_matematica': range(1, 11),
         'range_linguagem': range(11, 21),
+        'is_coordenador': is_coordenador  # Adicionamos esta variável ao contexto
     }
 
     return render(request, 'webapp/cadastro_escola.html', context)
 
+<<<<<<< HEAD
+=======
+
+
+
+
+
+
+
+>>>>>>> 3a8008a (Modelo Professores SAMACC EDUCAÇÃO INFANTIL 2025 concluído)
 ###***********************************************************************************************************************
 
 from django.http import JsonResponse
@@ -5576,7 +5616,8 @@ def lancar_conceito(request):
     return render(request, 'lancar_conceito.html', context)
 ###***********************************************************************************************************************
 from django.contrib.auth.decorators import login_required
-from .models import CadastroEI
+from django.shortcuts import render
+from .models import CadastroEI, Escolas
 
 @login_required
 def gestao_alunos(request):
@@ -5586,11 +5627,18 @@ def gestao_alunos(request):
     modalidade = request.GET.get('modalidade', '')
     turma = request.GET.get('turma', '')
 
-    # Verificação de superuser para acesso a todos os registros
+    # Verificar permissões do usuário
     if usuario_logado.is_superuser:
         registros = CadastroEI.objects.all()
     else:
-        registros = CadastroEI.objects.filter(professor=usuario_logado)
+        # Se for coordenador, vê todas as turmas da escola
+        escolas_vinculadas = Escolas.objects.filter(coordenador=usuario_logado)
+
+        if escolas_vinculadas.exists():
+            registros = CadastroEI.objects.filter(unidade_ensino__in=escolas_vinculadas.values_list('nome', flat=True))
+        else:
+            # Se for professor, vê apenas suas turmas
+            registros = CadastroEI.objects.filter(professor=usuario_logado)
 
     # Aplicação dos filtros
     if nome_escola:
@@ -5600,14 +5648,25 @@ def gestao_alunos(request):
     if modalidade:
         registros = registros.filter(modalidade__icontains=modalidade)
     if turma:
-        registros = registros.filter(turma__nome__icontains=turma)  # Filtrar pelo nome da turma
+        registros = registros.filter(turma__nome__icontains=turma)  # Certifique-se de usar 'turma__nome' se for ForeignKey
 
-    # Listar escolas e turmas
+    # 🔹 **Trazer apenas o nome da turma corretamente**
+    registros = registros.select_related("turma")  # Se `turma` for uma ForeignKey, otimiza o banco
+
+    # 🔹 **Listar turmas apenas pelo nome**
+    turmas = registros.order_by("turma__nome").values_list("turma__nome", flat=True).distinct()
+
+    # 🔹 **Contagem correta das turmas**
+    total_turmas = registros.values("unidade_ensino", "turma__nome").distinct().count()
+
+    # Listar escolas disponíveis
     escolas_nomes = registros.order_by("unidade_ensino").values_list("unidade_ensino", flat=True).distinct()
-    turmas = registros.order_by("turma__nome").values_list("turma__nome", flat=True).distinct()  # Retornar o nome das turmas
 
     total_alunos = registros.count()
+<<<<<<< HEAD
     total_turmas = registros.values("unidade_ensino", "turma").distinct().count()
+=======
+>>>>>>> 3a8008a (Modelo Professores SAMACC EDUCAÇÃO INFANTIL 2025 concluído)
     total_escolas = registros.values("unidade_ensino").distinct().count()
 
     registros_com_questoes = []
@@ -5615,17 +5674,24 @@ def gestao_alunos(request):
         questoes_matematica = [getattr(registro, f"questao_matematica_{i}", "BRANCO") for i in range(1, 11)]
         questoes_linguagem = [getattr(registro, f"questao_linguagem_{i}", "BRANCO") for i in range(11, 21)]
 
+        # Separar as questões que devem ser excluídas da pontuação
+        questoes_excluidas = {11, 13}
+
+        # Cálculo de pontuação
         pontuacao_matematica = sum(2 if resposta == "CERTO" else 1 if resposta == "PARCIAL" else 0 for resposta in questoes_matematica)
-        pontuacao_linguagem = sum(2 if resposta == "CERTO" else 1 if resposta == "PARCIAL" else 0 for resposta in questoes_linguagem)
+        pontuacao_linguagem = sum(
+            2 if resposta == "CERTO" else 1 if resposta == "PARCIAL" else 0 
+            for i, resposta in enumerate(questoes_linguagem, start=11) if i not in questoes_excluidas
+        )
 
         max_pontuacao_matematica = 20
-        max_pontuacao_linguagem = 20
+        max_pontuacao_linguagem = 16  
 
         desempenho_matematica = (pontuacao_matematica / max_pontuacao_matematica) * 100 if max_pontuacao_matematica > 0 else 0
         desempenho_linguagem = (pontuacao_linguagem / max_pontuacao_linguagem) * 100 if max_pontuacao_linguagem > 0 else 0
 
-        avaliacao_matematica = "Excelente" if desempenho_matematica >= 90 else "Bom" if desempenho_matematica >= 70 else "Regular" if desempenho_matematica >= 50 else "INSUFICIENTE"
-        avaliacao_linguagem = "Excelente" if desempenho_linguagem >= 90 else "Bom" if desempenho_linguagem >= 70 else "Regular" if desempenho_linguagem >= 50 else "INSUFICIENTE"
+        avaliacao_matematica = "Excelente" if desempenho_matematica == 100 else "Bom" if desempenho_matematica >= 70 else "Regular" if desempenho_matematica >= 50 else "INSUFICIENTE"
+        avaliacao_linguagem = "Excelente" if desempenho_linguagem == 100 else "Bom" if desempenho_linguagem >= 70 else "Regular" if desempenho_linguagem >= 50 else "INSUFICIENTE"
 
         registros_com_questoes.append({
             "registro": registro,
@@ -5640,7 +5706,7 @@ def gestao_alunos(request):
     context = {
         'registros_com_questoes': registros_com_questoes,
         'escolas_nomes': escolas_nomes,
-        'turmas': turmas,
+        'turmas': turmas,  # Lista de nomes das turmas sem IDs
         'total_alunos': total_alunos,
         'total_turmas': total_turmas,
         'total_escolas': total_escolas,
@@ -5662,99 +5728,149 @@ def gestao_alunos(request):
 
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from .models import CadastroEI
+from .models import CadastroEI, Escolas
 
 @login_required
 def gestao_relatorios(request):
     usuario_logado = request.user
+
+    # Obtendo filtros da URL
     nome_escola = request.GET.get('nome_escola', '')
     turma = request.GET.get('turma', '')
     ano = request.GET.get('ano', '')
     modalidade = request.GET.get('modalidade', '')
 
-    # Se for superuser, mostrar todos os registros
+    # Definir quais registros o usuário pode acessar
     if usuario_logado.is_superuser:
         registros = CadastroEI.objects.all()
     else:
-        registros = CadastroEI.objects.filter(professor=usuario_logado)  # Apenas registros vinculados ao professor logado
+        # Se for coordenador, trazer todas as turmas da escola que ele coordena
+        escolas_vinculadas = Escolas.objects.filter(coordenador=usuario_logado)
+        if escolas_vinculadas.exists():
+            registros = CadastroEI.objects.filter(unidade_ensino__in=escolas_vinculadas.values_list('nome', flat=True))
+        else:
+            # Caso contrário, trazer apenas as turmas do professor logado
+            registros = CadastroEI.objects.filter(professor=usuario_logado)
 
-    # Aplicar filtros
+    # Aplicação dos filtros
     if nome_escola:
         registros = registros.filter(unidade_ensino__icontains=nome_escola)
-    if turma:
-        registros = registros.filter(turma__nome__icontains=turma)  # Ajuste para campo 'nome' no modelo Turma
     if ano:
         registros = registros.filter(ano=ano)
     if modalidade:
         registros = registros.filter(modalidade__icontains=modalidade)
+    if turma:
+        registros = registros.filter(turma__nome__icontains=turma)
 
-    # Obter apenas as turmas vinculadas ao professor logado
-    turmas = (
-        registros
-        .select_related('turma')
-        .order_by('turma__nome')
-        .values_list('turma__nome', flat=True)
-        .distinct()
-    )
+    # Listando escolas e turmas únicas
+    escolas = registros.order_by("unidade_ensino").values_list("unidade_ensino", flat=True).distinct()
+    turmas = registros.order_by("turma__nome").values_list("turma__nome", flat=True).distinct()
 
-    # Obter todas as escolas disponíveis nos registros filtrados
-    escolas = registros.order_by('unidade_ensino').values_list('unidade_ensino', flat=True).distinct()
 
-    # Processamento das questões
-    relatorios = []
-    total_pontos_geral = 0
-    pontuacao = {'CERTO': 2, 'PARCIAL': 1, 'ERRADO': 0, 'BRANCO': 0, 'CRIANÇA COM LAUDO': 1.5}
+    # Inicializando variáveis estatísticas
     total_alunos_avaliados = registros.count()
-    total_excelente = 0
-    total_necessita_melhorar = 0
+    total_pontos_geral = 0
 
+    # Dicionário de pontuação
+    pontuacao = {'CERTO': 2, 'PARCIAL': 1, 'ERRADO': 0, 'BRANCO': 0, 'CRIANÇA COM LAUDO': 1.5}
+
+    # Contadores de avaliações
+    total_excelente = total_bom = total_regular = total_necessita_melhorar = total_insuficiente = 0
+
+    # Cálculo das estatísticas por aluno
+    relatorios = []
     for registro in registros:
         questoes_matematica = [getattr(registro, f"questao_matematica_{i}", "BRANCO") for i in range(1, 11)]
         questoes_linguagem = [getattr(registro, f"questao_linguagem_{i}", "BRANCO") for i in range(11, 21)]
+        questoes_excluidas = {11, 13}  # Exclui questões 1 e 3 de Linguagem
 
-        total_pontos = sum(pontuacao.get(resposta, 0) for resposta in questoes_matematica + questoes_linguagem)
+        pontuacao_matematica = sum(pontuacao.get(resposta, 0) for resposta in questoes_matematica)
+        pontuacao_linguagem = sum(
+            pontuacao.get(resposta, 0)
+            for i, resposta in enumerate(questoes_linguagem, start=11) if i not in questoes_excluidas
+        )
+
+        max_pontuacao_matematica = 20
+        max_pontuacao_linguagem = 16  
+        max_pontos = max_pontuacao_matematica + max_pontuacao_linguagem
+
+        total_pontos = pontuacao_matematica + pontuacao_linguagem
         total_pontos_geral += total_pontos
-        max_pontos = 40
-        desempenho = (total_pontos / max_pontos) * 100 if max_pontos > 0 else 0
+        desempenho_geral = (total_pontos / max_pontos) * 100 if max_pontos > 0 else 0
 
-        if desempenho >= 90:
-            avaliacao = "Excelente"
+        # Classificação de desempenho
+        if desempenho_geral == 100:
+            avaliacao_geral = "Excelente"
             total_excelente += 1
-        elif desempenho >= 70:
-            avaliacao = "Bom"
-        elif desempenho >= 50:
-            avaliacao = "Regular"
+        elif desempenho_geral >= 70:
+            avaliacao_geral = "Bom"
+            total_bom += 1
+        elif desempenho_geral >= 50:
+            avaliacao_geral = "Regular"
+            total_regular += 1
         else:
-            avaliacao = "Necessita Melhorar"
+            avaliacao_geral = "INSUFICIENTE"
             total_necessita_melhorar += 1
+            total_insuficiente += 1
 
         relatorios.append({
             'registro': registro,
-            'desempenho': f"{desempenho:.2f}%",
-            'avaliacao': avaliacao,
+            'desempenho': f"{desempenho_geral:.2f}%",
+            'avaliacao': avaliacao_geral,
             'questoes_matematica': questoes_matematica,
             'questoes_linguagem': questoes_linguagem,
         })
 
-    media_desempenho = (total_pontos_geral / (total_alunos_avaliados * 40) * 100) if total_alunos_avaliados > 0 else 0
+    # Cálculo de médias
+    media_desempenho = (total_pontos_geral / (total_alunos_avaliados * max_pontos) * 100) if total_alunos_avaliados > 0 else 0
+    media_matematica = (sum(pontuacao.get(q, 0) for registro in registros for q in questoes_matematica) / (total_alunos_avaliados * max_pontuacao_matematica) * 100) if total_alunos_avaliados > 0 else 0
+    media_linguagem = (sum(pontuacao.get(q, 0) for registro in registros for i, q in enumerate(questoes_linguagem, start=11) if i not in questoes_excluidas) / (total_alunos_avaliados * max_pontuacao_linguagem) * 100) if total_alunos_avaliados > 0 else 0
 
+    total_turmas = registros.values("turma").distinct().count()
+    maior_desempenho_qtd = sum(1 for r in relatorios if float(r['desempenho'].replace('%', '')) == 100)
+    menor_desempenho_qtd = sum(1 for r in relatorios if float(r['desempenho'].replace('%', '')) < 50)
+
+    total_faltantes_matematica = registros.filter(
+        **{f"questao_matematica_{i}": "FALTOU" for i in range(1, 11)}
+    ).count()
+
+    total_faltantes_linguagem = registros.filter(
+        **{f"questao_linguagem_{i}": "FALTOU" for i in range(11, 21)}
+    ).count()
+
+    # Preparando contexto para o template
     context = {
+        'maior_desempenho_qtd': maior_desempenho_qtd,
+        'menor_desempenho_qtd': menor_desempenho_qtd,
+        'total_turmas': total_turmas,
+        'total_faltantes_matematica': total_faltantes_matematica,
+        'total_faltantes_linguagem': total_faltantes_linguagem,
         'relatorios': relatorios,
         'escolas': escolas,
         'turmas': turmas,
+        'total_alunos_avaliados': total_alunos_avaliados,
+        'total_turmas': total_turmas,
+        'media_desempenho': f"{media_desempenho:.2f}%",
+        'media_matematica': f"{media_matematica:.2f}%",
+        'media_linguagem': f"{media_linguagem:.2f}%",
+        'total_excelente': total_excelente,
+        'total_bom': total_bom,
+        'total_regular': total_regular,
+        'total_necessita_melhorar': total_necessita_melhorar,
+        'total_insuficiente': total_insuficiente,
         'filtros': {
             'nome_escola': nome_escola,
             'turma': turma,
             'ano': ano,
             'modalidade': modalidade,
         },
-        'total_alunos_avaliados': total_alunos_avaliados,
-        'media_desempenho': f"{media_desempenho:.2f}",
-        'total_excelente': total_excelente,
-        'total_necessita_melhorar': total_necessita_melhorar,
     }
 
     return render(request, 'webapp/gestao_relatorios.html', context)
+
+
+
+
 
 
 
@@ -5776,7 +5892,8 @@ def gerar_pdf_relatorio(request):
     if nome_escola:
         registros = registros.filter(unidade_ensino__icontains=nome_escola)
     if turma:
-        registros = registros.filter(turma__icontains=turma)
+        registros = registros.filter(turma__nome__icontains=turma)  # ✅ Correto
+
     if ano:
         registros = registros.filter(ano=ano)
     if modalidade:
@@ -6414,7 +6531,7 @@ def editar_usuario(request, user_id):
 
     context = {'usuario': usuario}
     return render(request, 'semedapp/editar_usuario.html', context)
-
+###***********************************************************************************************************************
 
 # views.py
 from django.shortcuts import get_object_or_404, redirect
@@ -6426,7 +6543,7 @@ def excluir_usuario(request, user_id):
     usuario.delete()
     messages.success(request, 'Usuário excluído com sucesso!')
     return redirect('controle_usuarios')
-
+###***********************************************************************************************************************
 
 # views.py
 # from django.shortcuts import render, redirect
@@ -6459,7 +6576,7 @@ def adicionar_professor(request):
         return redirect('controle_usuarios')
 
     return render(request, 'semedapp/adicionar_professor.html')
-
+###***********************************************************************************************************************
 
 def adicionar_coordenador(request):
     if request.method == "POST":
@@ -6483,7 +6600,7 @@ def adicionar_coordenador(request):
         return redirect('controle_usuarios')
 
     return render(request, 'semedapp/adicionar_coordenador.html')
-
+###***********************************************************************************************************************
 
 def imprimir_curriculo_por_cpf(request, cpf):
     try:
@@ -6495,7 +6612,7 @@ def imprimir_curriculo_por_cpf(request, cpf):
         return response
     except Diretor.DoesNotExist:
         return HttpResponse("Currículo não encontrado", status=404)
-
+###***********************************************************************************************************************
 
 def imprimir_curriculo_por_diretor(request, diretor_id):
     try:
@@ -6507,7 +6624,7 @@ def imprimir_curriculo_por_diretor(request, diretor_id):
         return response
     except Diretor.DoesNotExist:
         return HttpResponse("Currículo não encontrado", status=404)
-
+###***********************************************************************************************************************
 
 def imprimir_curriculo_por_candidato(request, candidato_id):
     try:
@@ -6519,7 +6636,7 @@ def imprimir_curriculo_por_candidato(request, candidato_id):
         return response
     except CadastroCandidato.DoesNotExist:
         return HttpResponse("Currículo não encontrado para o candidato.", status=404)
-
+###***********************************************************************************************************************
 
 def imprimir_curriculo_diretor(request, diretor_id):
     try:
@@ -6531,8 +6648,7 @@ def imprimir_curriculo_diretor(request, diretor_id):
         return response
     except Diretor.DoesNotExist:
         return HttpResponse("Currículo não encontrado", status=404)
-
-
+###***********************************************************************************************************************
 
 from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import render, redirect
@@ -6551,6 +6667,7 @@ def registrar_professor(request):
     else:
         form = CustomUserProfCreationForm()
     return render(request, "semedapp/registrar_professor.html", {"form": form})
+###***********************************************************************************************************************
 
 def login_prof(request):
     if request.method == 'POST':
@@ -6569,27 +6686,45 @@ def login_prof(request):
             messages.error(request, "Nome de usuário ou senha incorretos.")
     
     return render(request, 'semedapp/login_prof.html')
-
-
-
+###***********************************************************************************************************************
 
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
+<<<<<<< HEAD
 from .models import CadastroEI  # Certifique-se de importar os modelos corretos
+=======
+from .models import CadastroEI, Escolas
+>>>>>>> 3a8008a (Modelo Professores SAMACC EDUCAÇÃO INFANTIL 2025 concluído)
 
 @login_required
 def modulo_pedagogico(request):
     usuario_logado = request.user
+<<<<<<< HEAD
     nome_escola = request.GET.get('nome_escola', '')
     ano = request.GET.get('ano', '')
     modalidade = request.GET.get('modalidade', '')
     turma_nome = request.GET.get('turma', '')
+=======
+    turma_nome = request.GET.get('turma', '')  # Captura o nome da turma nos filtros
+>>>>>>> 3a8008a (Modelo Professores SAMACC EDUCAÇÃO INFANTIL 2025 concluído)
 
     # Verificação de superuser para acesso a todos os registros
     if usuario_logado.is_superuser:
         alunos = CadastroEI.objects.all()
     else:
+<<<<<<< HEAD
         alunos = CadastroEI.objects.filter(professor=usuario_logado)
+=======
+        # Verifica se é coordenador (está vinculado a uma escola)
+        escolas_vinculadas = Escolas.objects.filter(coordenador=usuario_logado)
+        
+        if escolas_vinculadas.exists():
+            # Se for coordenador, traz todas as turmas da(s) escola(s) vinculadas
+            alunos = CadastroEI.objects.filter(unidade_ensino__in=escolas_vinculadas.values_list('nome', flat=True))
+        else:
+            # Se for professor, traz apenas os alunos de suas turmas
+            alunos = CadastroEI.objects.filter(professor=usuario_logado)
+>>>>>>> 3a8008a (Modelo Professores SAMACC EDUCAÇÃO INFANTIL 2025 concluído)
 
     # Aplicação dos filtros
     if nome_escola:
@@ -6610,8 +6745,12 @@ def modulo_pedagogico(request):
     escolas_nomes = alunos.order_by("unidade_ensino").values_list("unidade_ensino", flat=True).distinct()
     turmas = alunos.order_by("turma__nome").values_list("turma__nome", flat=True).distinct()  # Alterado para pegar o nome
 
+    # Listar nomes das turmas disponíveis
+    turmas_disponiveis = alunos.order_by("turma").values_list("turma", flat=True).distinct()
+
     context = {
         'alunos': alunos,
+<<<<<<< HEAD
         'escolas_nomes': escolas_nomes,
         'turmas': turmas,
         'total_alunos': total_alunos,
@@ -6623,13 +6762,15 @@ def modulo_pedagogico(request):
             'modalidade': modalidade,
             'turma': turma_nome,
         }
+=======
+        'turma_nome': turma_nome,  # Para mostrar o filtro aplicado
+        'turmas_disponiveis': turmas_disponiveis,  # Listagem de turmas únicas
+>>>>>>> 3a8008a (Modelo Professores SAMACC EDUCAÇÃO INFANTIL 2025 concluído)
     }
 
     return render(request, 'webapp/modulo_pedagogico.html', context)
 
-
-
-
+###***********************************************************************************************************************
 
 
 
@@ -6637,9 +6778,6 @@ def logout_prof(request):
     logout(request)
     messages.success(request, "Você saiu com sucesso.")
     return redirect('login_prof')
-
-
-
 
 # from django.contrib.auth.decorators import login_required
 # from django.http import HttpResponseForbidden
@@ -6649,7 +6787,7 @@ def logout_prof(request):
 #     if not request.user.is_authenticated:
 #         return HttpResponseForbidden("Acesso negado.")
 #     return render(request, 'semedapp/pagina_professor.html')
-
+###***********************************************************************************************************************
 
 def login_prof_view(request):
     print("View login_prof_view foi chamada")
@@ -6668,9 +6806,7 @@ def login_prof_view(request):
         'turmas': list(turmas),
     }
     return render(request, 'semedapp/login_prof.html', context)
-
-
-
+###***********************************************************************************************************************
 
 from django.http import JsonResponse
 from .models import CadastroEI
@@ -6684,13 +6820,9 @@ def carregar_unidades_turmas(request):
         "turmas": list(turmas)
     }
     return JsonResponse(data)
-
-
-
-
+###***********************************************************************************************************************
 
 from django.contrib.auth.decorators import login_required
-
 @login_required
 def your_view(request):
     is_professor = request.user.groups.filter(name="Professor").exists()
@@ -6699,8 +6831,7 @@ def your_view(request):
         'is_professor': is_professor,
     }
     return render(request, 'your_template.html', context)
-
-
+###***********************************************************************************************************************
 # user_groups.py
 from django import template
 
@@ -6709,8 +6840,7 @@ register = template.Library()
 @register.filter
 def has_group(user, group_name):
     return user.groups.filter(name=group_name).exists()
-
-
+###***********************************************************************************************************************
 
 from django.shortcuts import render, get_object_or_404, redirect
 from .models import Aluno  # Certifique-se de importar o modelo correto
@@ -6728,8 +6858,7 @@ def editar_aluno(request, id):
         form = AlunoForm(instance=aluno)
     
     return render(request, 'webapp/editar_aluno.html', {'form': form, 'aluno': aluno})
-
-
+###***********************************************************************************************************************
 
 from django.shortcuts import get_object_or_404, redirect
 from .models import Aluno  # substitua pelo nome correto do seu modelo
@@ -6739,9 +6868,7 @@ def avaliar_aluno(request, id):
     aluno.avaliado = "SIM"  # atualize o campo para indicar que foi avaliado
     aluno.save()
     return redirect('modulo_pedagogico')  # substitua pelo nome correto da sua URL de redirecionamento
-
-
-
+###***********************************************************************************************************************
 
 from django.http import JsonResponse
 from .models import Escola, Turma  # Certifique-se de que esses modelos existem
@@ -6752,3 +6879,12 @@ def carregar_turmas_por_escola(request):
         turmas = Turma.objects.filter(escola__nome=escola_nome).values_list('nome', flat=True).distinct()
         return JsonResponse({'turmas': list(turmas)})
     return JsonResponse({'turmas': []})
+###***********************************************************************************************************************
+
+from django.shortcuts import render
+from semedapp.decorators import module_required
+
+@module_required('pedagogico')
+def minha_view_pedagogica(request):
+    return render(request, "pedagogico.html")
+###***********************************************************************************************************************

@@ -17,13 +17,25 @@
         <div class="container-fluid">
             <div class="card">
                 <div class="card-header bg-primary text-white">
+<<<<<<< HEAD
                     <h3 class="card-title">Bem-vindo, <b>{{ user.username }}</b>...  </h3>
                     {% if user.is_superuser %}
                         <p> Você está logado como <b>Administrador</b> e pode gerenciar todos os alunos.</p>
+=======
+                    <h3 class="card-title">Bem-vindo, <b>{{ user.username }}</b>!</h3>
+                
+                    {% if user.is_superuser %}
+                        <p>Você está logado <b>Administrador</b> e pode gerenciar todos os alunos.</p>
+                
+                        {% elif user.is_coordenador %}
+                        <p>Você está logado como <b>Coordenador(a)</b> e pode visualizar todas as turmas da escola que coordena.</p>
+                
+>>>>>>> 3a8008a (Modelo Professores SAMACC EDUCAÇÃO INFANTIL 2025 concluído)
                     {% else %}
-                        <p>Você está logado como <b>Professor</b> e pode visualizar apenas seus alunos vinculados.</p>
+                        <p>Você está logado como <b>Professor(a)</b> e pode visualizar apenas suas turmas vinculadas.</p>
                     {% endif %}
                 </div>
+                
 
 
                 <!-- 🔍 Área de Filtragem -->
